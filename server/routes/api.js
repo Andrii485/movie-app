@@ -3,7 +3,7 @@ const router = express.Router();
 const driver = require('../neo4j/db');
 const neo4j = require('neo4j-driver');
 
-// Утилита для конвертации Neo4j Integer → Number
+// Конвертация Integer → Number
 const toNative = (value) => {
   if (value === null || value === undefined) return value;
   if (value instanceof neo4j.types.Integer) return value.toNumber();
@@ -16,13 +16,12 @@ const toNative = (value) => {
   return value;
 };
 
+// --- GET /movies ---
 router.get('/movies', async (req, res) => {
-  console.log('GET /api/movies');
   const session = driver.session();
   try {
     const result = await session.run('MATCH (m:Movie) RETURN m.title AS title ORDER BY title');
     const movies = result.records.map(r => r.get('title'));
-    console.log('Movies:', movies.length);
     res.json(movies);
   } catch (err) {
     console.error('Error /movies:', err);
@@ -32,41 +31,7 @@ router.get('/movies', async (req, res) => {
   }
 });
 
-router.get('/movie/:title', async (req, res) => {
-  const title = decodeURIComponent(req.params.title);
-  console.log('GET /api/movie/', title);
-  const session = driver.session();
-  try {
-    const result = await session.run(
-      `MATCH (m:Movie {title: $title})
-       OPTIONAL MATCH (p:Person)-[r:ACTED_IN|DIRECTED|PRODUCED|WROTE]->(m)
-       RETURN m, collect({person: p.name, role: type(r)}) AS people`,
-      { title }
-    );
-
-    if (result.records.length === 0) {
-      console.log('Movie not found:', title);
-      return res.status(404).json({ error: 'Movie not found' });
-    }
-
-    const record = result.records[0];
-    const movie = toNative(record.get('m').properties);
-    const people = record.get('people').map(p => ({
-      person: p.person,
-      role: p.role
-    }));
-
-    console.log('Movie fetched:', movie.title, 'People:', people.length);
-    res.json({ ...movie, people });
-  } catch (err) {
-    console.error('Error /movie:', err);
-    res.status(500).json({ error: 'Failed to fetch movie details' });
-  } finally {
-    await session.close();
-  }
-});
-
-// Остальные эндпоинты (коротко, но с защитой)
+// --- GET /people ---
 router.get('/people', async (req, res) => {
   const session = driver.session();
   try {
@@ -81,19 +46,144 @@ router.get('/people', async (req, res) => {
   }
 });
 
+// --- GET /movie/:title ---
+router.get('/movie/:title', async (req, res) => {
+  const title = decodeURIComponent(req.params.title);
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `MATCH (m:Movie {title: $title})
+       OPTIONAL MATCH (p:Person)-[r:ACTED_IN|DIRECTED|PRODUCED|WROTE]->(m)
+       RETURN m, collect({person: p.name, role: type(r)}) AS people`,
+      { title }
+    );
+
+    if (result.records.length === 0) return res.status(404).json({ error: 'Movie not found' });
+
+    const record = result.records[0];
+    const movie = toNative(record.get('m').properties);
+    const people = record.get('people').map(p => ({ person: p.person, role: p.role }));
+    res.json({ ...movie, people });
+  } catch (err) {
+    console.error('Error /movie:', err);
+    res.status(500).json({ error: 'Failed to fetch movie' });
+  } finally {
+    await session.close();
+  }
+});
+
+// --- GET /actor/:name ---
+router.get('/actor/:name', async (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `MATCH (p:Person {name: $name})-[:ACTED_IN]->(m:Movie)
+       RETURN m.title AS title ORDER BY title`,
+      { name }
+    );
+    const movies = result.records.map(r => r.get('title'));
+    res.json(movies);
+  } catch (err) {
+    console.error('Error /actor:', err);
+    res.status(500).json({ error: 'Failed to fetch actor movies' });
+  } finally {
+    await session.close();
+  }
+});
+
+// --- GET /director-producer/:name ---
+router.get('/director-producer/:name', async (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `MATCH (p:Person {name: $name})-[r:DIRECTED|PRODUCED]->(m:Movie)
+       RETURN m.title AS title, type(r) AS role ORDER BY title`,
+      { name }
+    );
+    const movies = result.records.map(r => ({
+      title: r.get('title'),
+      role: r.get('role')
+    }));
+    res.json(movies);
+  } catch (err) {
+    console.error('Error /director-producer:', err);
+    res.status(500).json({ error: 'Failed to fetch director/producer movies' });
+  } finally {
+    await session.close();
+  }
+});
+
+// --- GET /related-movies/:title ---
+router.get('/related-movies/:title', async (req, res) => {
+  const title = decodeURIComponent(req.params.title);
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `MATCH (m:Movie {title: $title})<-[r:DIRECTED|PRODUCED]-(p:Person)
+       MATCH (p)-[r2:DIRECTED|PRODUCED]->(m2:Movie)
+       WHERE m2.title <> $title
+       RETURN DISTINCT m2.title AS title, type(r2) AS role ORDER BY title`,
+      { title }
+    );
+    const movies = result.records.map(r => ({
+      title: r.get('title'),
+      role: r.get('role')
+    }));
+    res.json(movies);
+  } catch (err) {
+    console.error('Error /related-movies:', err);
+    res.status(500).json({ error: 'Failed to fetch related movies' });
+  } finally {
+    await session.close();
+  }
+});
+
+// --- POST /add-data ---
+router.post('/add-data', async (req, res) => {
+  const { movieTitle, movieYear, movieTagline, personName, personRole } = req.body;
+  if (!movieTitle || !movieYear) {
+    return res.status(400).json({ error: 'Movie title and year required' });
+  }
+  const session = driver.session();
+  try {
+    await session.run(
+      `MERGE (m:Movie {title: $title})
+       SET m.released = $released, m.tagline = $tagline`,
+      { title: movieTitle, released: parseInt(movieYear), tagline: movieTagline || null }
+    );
+    if (personName && personRole) {
+      await session.run(
+        `MERGE (p:Person {name: $name})
+         MERGE (m:Movie {title: $title})
+         MERGE (p)-[:${personRole}]->(m)`,
+        { name: personName, title: movieTitle }
+      );
+    }
+    res.json({ message: 'Data added successfully' });
+  } catch (err) {
+    console.error('Error /add-data:', err);
+    res.status(500).json({ error: 'Failed to add data' });
+  } finally {
+    await session.close();
+  }
+});
+
+// --- GET /top-actor ---
 router.get('/top-actor', async (req, res) => {
   const session = driver.session();
   try {
     const result = await session.run(
       `MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
-       RETURN p.name, COUNT(m) AS count
+       RETURN p.name AS name, COUNT(m) AS count
        ORDER BY count DESC LIMIT 1`
     );
     if (result.records.length === 0) {
       return res.json({ name: 'No actors', movieCount: 0 });
     }
     const r = result.records[0];
-    res.json({ name: r.get('p.name'), movieCount: r.get('count').toNumber() });
+    res.json({ name: r.get('name'), movieCount: r.get('count').toNumber() });
   } catch (err) {
     console.error('Error /top-actor:', err);
     res.status(500).json({ error: 'Failed to fetch top actor' });
@@ -101,7 +191,5 @@ router.get('/top-actor', async (req, res) => {
     await session.close();
   }
 });
-
-// Добавьте остальные эндпоинты по аналогии...
 
 module.exports = router;

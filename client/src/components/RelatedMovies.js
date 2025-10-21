@@ -1,48 +1,60 @@
 import React, { useState } from 'react';
 
-const RelatedMovies = ({ movies }) => {
+const RelatedMovies = ({ movies = [] }) => {
   const [selectedMovie, setSelectedMovie] = useState('');
-  const [relatedMovies, setRelatedMovies] = useState([]);
+  const [related, setRelated] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const fetchRelatedMovies = async () => {
+  const fetchRelated = async () => {
     if (!selectedMovie) return;
+    setLoading(true);
+    setError('');
+    setRelated([]);
+
     try {
-      const response = await fetch(`http://localhost:5001/api/related-movies/${encodeURIComponent(selectedMovie)}`);
-      const data = await response.json();
-      setRelatedMovies(data);
-    } catch (error) {
-      console.error('Error fetching related movies:', error);
+      const res = await fetch(`http://localhost:5001/api/related-movies/${encodeURIComponent(selectedMovie)}`);
+      if (!res.ok) throw new Error('No related movies');
+      const data = await res.json();
+      setRelated(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div>
-      <h2 className="text-2xl font-semibold mb-2">Select a Movie for Related Movies</h2>
-      <select
-        className="border p-2 mb-4 w-full"
-        value={selectedMovie}
-        onChange={(e) => setSelectedMovie(e.target.value)}
-      >
-        <option value="">Select a movie</option>
-        {movies.map(movie => (
-          <option key={movie} value={movie}>{movie}</option>
-        ))}
-      </select>
-      <button
-        className="bg-blue-500 text-white p-2 rounded"
-        onClick={fetchRelatedMovies}
-      >
-        Show Related Movies
-      </button>
-      {relatedMovies.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-xl font-semibold">Related Movies</h3>
-          <ul>
-            {relatedMovies.map((movie, i) => (
-              <li key={i}>{movie.title} ({movie.role})</li>
-            ))}
-          </ul>
-        </div>
+    <div className="p-6 bg-white rounded-lg shadow">
+      <h2 className="text-2xl font-bold mb-4">Related films</h2>
+      <div className="flex gap-3 mb-4">
+        <select
+          className="flex-1 border rounded p-2"
+          value={selectedMovie}
+          onChange={(e) => setSelectedMovie(e.target.value)}
+        >
+          <option value="">Select a movie</option>
+          {movies.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <button
+          onClick={fetchRelated}
+          disabled={!selectedMovie || loading}
+          className="bg-orange-600 text-white px-4 py-2 rounded disabled:bg-gray-400"
+        >
+          {loading ? '' : 'Show'}
+        </button>
+      </div>
+
+      {error && <p className="text-red-600">{error}</p>}
+
+      {related.length > 0 ? (
+        <ul className="list-disc ml-5">
+          {related.map((m, i) => (
+            <li key={i}>{m.title} <span className="text-sm text-gray-600">({m.role})</span></li>
+          ))}
+        </ul>
+      ) : (
+        !loading && selectedMovie && <p className="text-gray-500">There are no related films.</p>
       )}
     </div>
   );

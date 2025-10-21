@@ -26,7 +26,7 @@ const MovieSelector = ({ movies = [] }) => {
       setMovieDetails(data);
     } catch (err) {
       console.error('Fetch error:', err);
-      setError(err.message || 'Не удалось загрузить фильм');
+      setError(err.message || 'Failed to load movie');
     } finally {
       setLoading(false);
     }
@@ -34,7 +34,7 @@ const MovieSelector = ({ movies = [] }) => {
 
   return (
     <div className="p-6 bg-white rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-4">Подробности о фильме</h2>
+      <h2 className="text-2xl font-bold mb-4">Details about the film</h2>
 
       <div className="flex gap-3 mb-4">
         <select
@@ -43,7 +43,7 @@ const MovieSelector = ({ movies = [] }) => {
           onChange={(e) => setSelectedMovie(e.target.value)}
           disabled={loading}
         >
-          <option value="">Выберите фильм</option>
+          <option value="">Select a movie</option>
           {movies.map((m) => (
             <option key={m} value={m}>{m}</option>
           ))}
@@ -53,7 +53,7 @@ const MovieSelector = ({ movies = [] }) => {
           disabled={!selectedMovie || loading}
           className="bg-blue-600 text-white px-4 py-2 rounded disabled:bg-gray-400 hover:bg-blue-700"
         >
-          {loading ? 'Загрузка...' : 'Показать'}
+          {loading ? '' : 'Show'}
         </button>
       </div>
 
@@ -66,10 +66,10 @@ const MovieSelector = ({ movies = [] }) => {
       {movieDetails && (
         <div className="border rounded p-4 bg-gray-50">
           <h3 className="text-xl font-bold">{movieDetails.title}</h3>
-          <p><strong>Год:</strong> {movieDetails.released || 'Не указан'}</p>
-          {movieDetails.tagline && <p><strong>Слоган:</strong> {movieDetails.tagline}</p>}
+          <p><strong>Year:</strong> {movieDetails.released || 'Не указан'}</p>
+          {movieDetails.tagline && <p><strong>Slogan:</strong> {movieDetails.tagline}</p>}
 
-          <h4 className="font-semibold mt-3">Участники:</h4>
+          <h4 className="font-semibold mt-3">Participants:</h4>
           {movieDetails.people && movieDetails.people.length > 0 ? (
             <ul className="list-disc ml-5 mt-2">
               {movieDetails.people.map((p, i) => (
@@ -79,13 +79,13 @@ const MovieSelector = ({ movies = [] }) => {
               ))}
             </ul>
           ) : (
-            <p className="text-gray-500 italic">Нет данных об участниках</p>
+            <p className="text-gray-500 italic">No data on participants</p>
           )}
         </div>
       )}
 
       {!movieDetails && !loading && !error && selectedMovie && (
-        <p className="text-gray-500">Нажмите "Показать", чтобы загрузить данные</p>
+        <p className="text-gray-500">Click "Show" to download the data.</p>
       )}
     </div>
   );
