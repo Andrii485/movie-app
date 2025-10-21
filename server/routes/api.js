@@ -3,7 +3,7 @@ const router = express.Router();
 const driver = require('../neo4j/db');
 const neo4j = require('neo4j-driver');
 
-// Конвертация Integer → Number
+
 const toNative = (value) => {
   if (value === null || value === undefined) return value;
   if (value instanceof neo4j.types.Integer) return value.toNumber();
@@ -16,7 +16,7 @@ const toNative = (value) => {
   return value;
 };
 
-// --- GET /movies ---
+
 router.get('/movies', async (req, res) => {
   const session = driver.session();
   try {
@@ -31,7 +31,7 @@ router.get('/movies', async (req, res) => {
   }
 });
 
-// --- GET /people ---
+
 router.get('/people', async (req, res) => {
   const session = driver.session();
   try {
@@ -46,7 +46,6 @@ router.get('/people', async (req, res) => {
   }
 });
 
-// --- GET /movie/:title ---
 router.get('/movie/:title', async (req, res) => {
   const title = decodeURIComponent(req.params.title);
   const session = driver.session();
@@ -72,7 +71,6 @@ router.get('/movie/:title', async (req, res) => {
   }
 });
 
-// --- GET /actor/:name ---
 router.get('/actor/:name', async (req, res) => {
   const name = decodeURIComponent(req.params.name);
   const session = driver.session();
@@ -92,7 +90,6 @@ router.get('/actor/:name', async (req, res) => {
   }
 });
 
-// --- GET /director-producer/:name ---
 router.get('/director-producer/:name', async (req, res) => {
   const name = decodeURIComponent(req.params.name);
   const session = driver.session();
@@ -115,7 +112,6 @@ router.get('/director-producer/:name', async (req, res) => {
   }
 });
 
-// --- GET /related-movies/:title ---
 router.get('/related-movies/:title', async (req, res) => {
   const title = decodeURIComponent(req.params.title);
   const session = driver.session();
@@ -140,7 +136,6 @@ router.get('/related-movies/:title', async (req, res) => {
   }
 });
 
-// --- POST /add-data ---
 router.post('/add-data', async (req, res) => {
   const { movieTitle, movieYear, movieTagline, personName, personRole } = req.body;
   if (!movieTitle || !movieYear) {
@@ -170,7 +165,6 @@ router.post('/add-data', async (req, res) => {
   }
 });
 
-// --- GET /top-actor ---
 router.get('/top-actor', async (req, res) => {
   const session = driver.session();
   try {
